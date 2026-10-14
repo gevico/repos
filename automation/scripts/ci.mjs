@@ -81,7 +81,8 @@ async function apply() {
   if (pullRequest) pullRequest = (await control.rest.pulls.get({ owner, repo, pull_number: pullRequest.number })).data;
   if (!pullRequest && Object.keys(catalog).length) throw new Error('A merged pull request is required to change repositories');
   let review;
-  if (pullRequest) {
+  const files = pullRequest ? await control.paginate(control.rest.pulls.listFiles, { owner, repo, pull_number: pullRequest.number }) : [];
+  if (pullRequest && files.some((file) => isRepositoryRequest(file.filename) || isRepositoryRequest(file.previous_filename ?? ''))) {
     const base = commit.parents[0]?.sha;
     if (!base) throw new Error('Merged commit must have an approved base commit');
     const before = await remoteCatalog(control, owner, repo, base, path.join(work, 'base'));
