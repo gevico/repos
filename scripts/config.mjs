@@ -7,6 +7,10 @@ import { parseDocument, stringify } from 'yaml';
 export const root = path.resolve(import.meta.dirname, '..');
 export const work = path.join(root, '.work');
 
+export function isRepositoryDocumentation(filename) {
+  return filename === 'repositories/README.md' || filename === 'repositories/docs' || filename.startsWith('repositories/docs/');
+}
+
 export function parseYaml(text, label) {
   if (Buffer.byteLength(text) > 65_536) throw new Error(`${label}: file exceeds 64 KiB`);
   const document = parseDocument(text, { uniqueKeys: true, strict: true });
@@ -76,6 +80,8 @@ export async function loadCatalog(directory = root, policyDirectory = root) {
   const entries = await fs.readdir(path.join(directory, 'repositories'), { withFileTypes: true });
   for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
     if (entry.name === '.gitkeep' && entry.isFile()) continue;
+    if (entry.name === 'README.md' && entry.isFile()) continue;
+    if (entry.name === 'docs' && entry.isDirectory()) continue;
     if (!entry.isFile() || !/^[a-z0-9]+(?:-[a-z0-9]+)*\.yaml$/.test(entry.name)) throw new Error(`repositories/${entry.name}: only ordinary <name>.yaml files are accepted`);
     const document = parseYaml(await fs.readFile(path.join(directory, 'repositories', entry.name), 'utf8'), entry.name);
     const request = await validateRequest(document, policy, entry.name);

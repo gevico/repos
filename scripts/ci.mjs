@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { root, work, loadCatalog, loadPolicy, checkTransition, changedNames, digest, writeJson } from './config.mjs';
+import { root, work, loadCatalog, loadPolicy, checkTransition, changedNames, digest, writeJson, isRepositoryDocumentation } from './config.mjs';
 import { github, remoteCatalog, inspectCatalog, verifyCatalog, comment, status } from './github.mjs';
 import { StateStore } from './state.mjs';
 import { prepareTerraform, terraformPlan, terraformApply, run } from './runtime.mjs';
@@ -27,12 +27,12 @@ async function request() {
   const head = pullRequest.head.sha;
   await status(control, owner, repo, head, 'pending', 'Validating repository request', 'request/check');
   const files = await control.paginate(control.rest.pulls.listFiles, { owner, repo, pull_number: number });
-  const requests = files.filter((file) => file.filename.startsWith('repositories/'));
+  const requests = files.filter((file) => file.filename.startsWith('repositories/') && !isRepositoryDocumentation(file.filename));
   if (!requests.length) {
     await status(control, owner, repo, head, 'success', 'Maintenance PR; repository requests unchanged', 'request/check');
     return;
   }
-  if (files.some((file) => !file.filename.startsWith('repositories/'))) throw new Error('Repository requests must be submitted separately from management code or policy changes');
+  if (files.some((file) => !file.filename.startsWith('repositories/') || isRepositoryDocumentation(file.filename))) throw new Error('Repository requests must be submitted separately from management code, policy or documentation changes');
   if (requests.some((file) => ['removed', 'renamed'].includes(file.status))) throw new Error('Removing or renaming repository requests is prohibited');
   if (process.env.AUTOMATION_ENABLED !== 'true') throw new Error('Organization automation is not configured; administrator must complete docs/setup.md');
   const reader = github();

@@ -54,6 +54,9 @@ test('catalog loading rejects symlinked requests and unrelated files', async () 
   const file = path.join(directory, 'repositories/coach.yaml');
   try {
     await fs.writeFile(file, requestYaml(request));
+    await fs.writeFile(path.join(directory, 'repositories/README.md'), '# Repository requests\n');
+    await fs.mkdir(path.join(directory, 'repositories/docs'));
+    await fs.writeFile(path.join(directory, 'repositories/docs/requesting.md'), '# Requesting a repository\n');
     assert.deepEqual((await loadCatalog(directory)).catalog.coach, request);
     await fs.rename(file, path.join(directory, 'original.yaml'));
     await fs.symlink(path.join(directory, 'original.yaml'), file);
