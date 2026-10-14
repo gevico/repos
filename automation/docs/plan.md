@@ -69,7 +69,7 @@ flowchart TD
 
 普通申请 PR 修改 `repositories/` 中的配置。管理程序、Schema、政策和工作流的修改通过独立的管理员维护 PR 审核，并执行对应验证。
 
-`repositories/README.md` 和 `repositories/docs/` 保存使用文档。文档通过维护 PR 审核；仓库申请只修改普通 YAML 文件。申请读取程序与 PR 文件分类使用相同的文档路径规则。
+全部使用文档保存在 `automation/docs/`。`repositories/` 只保存实际仓库申请 YAML。文档通过维护 PR 审核；仓库申请只修改普通 YAML 文件。申请读取程序与 PR 文件分类使用相同的声明文件路径规则。没有声明文件时，目录读取返回空配置。
 
 检查实际用户、团队和模板是否存在，判断目标名称是否与已登记或未登记仓库冲突。外部协作者须满足组织政策；预览区分直接授权和等待接受的邀请。
 
@@ -163,7 +163,7 @@ PR 的必需检查确认其 base SHA 已成功应用。上一条合并的配置�
 - `.agents/skills/repo-request/`：自然语言申请 skill 及其界面元数据。
 - `.github/CODEOWNERS`：管理团队审核范围。
 - `.github/PULL_REQUEST_TEMPLATE.md`：仓库用途、维护负责人和权限申请说明。
-- `repositories/README.md` 与 `repositories/docs/`：申请方式、管理员部署、已有仓库导入、故障恢复和验证记录。
+- `automation/docs/`：申请方式、管理员部署、已有仓库导入、故障恢复、验证记录、实施设计与调研证据。
 - `automation/docs/documentation-guidelines.md`：面向项目文档的内容、命令、来源和排版规范。
 - `README.md`：申请入口、配置字段、审核规则及执行结果查询方式。
 

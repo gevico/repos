@@ -4,7 +4,7 @@
 
 README 面向申请人，说明项目用途、自然语言申请入口、审核流程和文档导航。申请文档解释字段和权限；部署文档列出准确的参数、权限和执行命令；运行文档解释结果、导入和恢复。
 
-实施设计保存在 `automation/docs/plan.md`，来源证据保存在 `automation/docs/research.md`。申请说明位于 `repositories/README.md`，部署、运行与验证文档位于 `repositories/docs/`。申请人需要理解的行为写入根目录 README 和对应操作文档。
+实施设计保存在 `automation/docs/plan.md`，来源证据保存在 `automation/docs/research.md`。申请、部署、运行与验证文档位于 `automation/docs/`。`repositories/` 只保存实际仓库申请 YAML。申请人需要理解的行为写入根目录 README 和对应操作文档。
 
 ## 表述与排版
 

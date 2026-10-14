@@ -5,7 +5,7 @@ description: Turn a natural-language request into a validated gevico repository 
 
 # Repository request
 
-Use the current checkout's `automation/policy.yml`, `automation/schema/repository.schema.json`, and `repositories/README.md` as the configuration contract. Resolve the checkout root from this skill's location. Run commands from that root. Implementation and dependencies are under `automation/`; generated declarations remain under `repositories/`.
+Use the current checkout's `automation/policy.yml`, `automation/schema/repository.schema.json`, and `automation/docs/requesting.md` as the configuration contract. Resolve the checkout root from this skill's location. Run commands from that root. Implementation, dependencies and documentation are under `automation/`; `repositories/` contains only actual repository declaration YAML files.
 
 Interpret the user's language into a repository name, purpose, visibility, maintainers, user permissions, team permissions, and an optional template. Use public visibility unless the user requests private. Translate read/write to `pull`/`push`; maintainer maps to `maintain`. The policy's administrator users and teams keep their `admin` role.
 

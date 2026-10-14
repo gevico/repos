@@ -6,7 +6,7 @@
 
 GitHub Actions 创建仓库、配置权限，并核验每次执行的结果。
 
-[开始申请](#用日常语言申请) · [配置字段](repositories/README.md) · [管理员配置](repositories/docs/setup.md) · [运行与恢复](repositories/docs/operations.md)
+[开始申请](#用日常语言申请) · [配置字段](automation/docs/requesting.md) · [管理员配置](automation/docs/setup.md) · [运行与恢复](automation/docs/operations.md)
 
 </div>
 
@@ -60,7 +60,7 @@ access:
 
 这是配置格式示例。实际申请中的名称、维护负责人和权限来自用户描述及组织政策。当前管理账号 `zevorn` 保留管理权限。
 
-可用角色为 `pull`、`triage`、`push`、`maintain` 和 `admin`。团队使用现有组织团队的 slug。模板来源由管理员清单控制。[查看字段与权限说明](repositories/README.md)
+可用角色为 `pull`、`triage`、`push`、`maintain` 和 `admin`。团队使用现有组织团队的 slug。模板来源由管理员清单控制。[查看字段与权限说明](automation/docs/requesting.md)
 
 ## Actions 执行仓库管理
 
@@ -70,14 +70,14 @@ access:
 
 工作流运行在 GitHub 托管 runner。GitHub App 提供组织访问权限，任务内生成临时令牌。Terraform 状态使用 SOPS/age 加密，保存在私有仓库 `gevico/repos-state`。PR 预览记录加密保存到 Actions artifacts；执行任务核验记录来源后，将记录保存到私有状态仓库。全部运行和存储使用 GitHub 资源。
 
-管理员先完成 [部署配置](repositories/docs/setup.md)。仓库申请开始执行的条件是 `AUTOMATION_ENABLED=true`，以及有效的 App 凭证、私有状态仓库和加密密钥。`gevico` 当前使用 GitHub Free；私有目标仓库需要先具备分支保护能力，再更新已核实的组织政策。
+管理员先完成 [部署配置](automation/docs/setup.md)。仓库申请开始执行的条件是 `AUTOMATION_ENABLED=true`，以及有效的 App 凭证、私有状态仓库和加密密钥。`gevico` 当前使用 GitHub Free；私有目标仓库需要先具备分支保护能力，再更新已核实的组织政策。
 
 ## 目录与文件
 
 | 位置 | 内容 |
 | --- | --- |
-| [`automation/`](automation/) | 管理程序、Terraform、Schema、政策、测试与工程文档 |
-| [`repositories/`](repositories/) | 仓库申请 YAML、申请说明、部署与运行文档 |
+| [`automation/`](automation/) | 管理程序、Terraform、Schema、政策、测试与全部文档 |
+| `repositories/` | 实际仓库申请的 `<name>.yaml` 文件 |
 | `README.md` | 项目入口与申请流程 |
 
 GitHub 从 `.github/` 发现工作流和审核配置，编码助手从 `.agents/skills/` 发现仓库 skill。这两个目录保留在项目根目录。
@@ -105,10 +105,10 @@ npm --prefix automation run check
 
 ## 文档与贡献
 
-- [申请仓库和修改权限](repositories/README.md)
-- [配置 GitHub App、状态仓库和加密密钥](repositories/docs/setup.md)
-- [执行结果、冲突、导入与恢复](repositories/docs/operations.md)
-- [已执行的验证](repositories/docs/verification.md)
+- [申请仓库和修改权限](automation/docs/requesting.md)
+- [配置 GitHub App、状态仓库和加密密钥](automation/docs/setup.md)
+- [执行结果、冲突、导入与恢复](automation/docs/operations.md)
+- [已执行的验证](automation/docs/verification.md)
 - [文档编写规范](automation/docs/documentation-guidelines.md)
 - [贡献流程](.github/CONTRIBUTING.md)
 

@@ -39,7 +39,7 @@ npm --prefix automation run state:setup
 
 密钥的本地备份为 `.work/state-age-key.txt`，文件权限为 `0600`。请将其保存到自己的密码管理器或安全备份位置。重复配置使用已有密钥；仓库已有公钥而本地密钥缺失时，程序要求恢复对应密钥。
 
-状态后端使用 [terraform-backend-git v0.1.12](https://github.com/plumber-cd/terraform-backend-git/tree/v0.1.12) 的 Git 存储、远程锁和 SOPS/age 加密。后端只在任务运行期间监听 runner 的 `127.0.0.1`，由 Terraform 的 HTTP 后端访问。任务结束后终止后端进程。构建和提交身份配置见 [后端说明](../../automation/backend/README.md)。
+状态后端使用 [terraform-backend-git v0.1.12](https://github.com/plumber-cd/terraform-backend-git/tree/v0.1.12) 的 Git 存储、远程锁和 SOPS/age 加密。后端只在任务运行期间监听 runner 的 `127.0.0.1`，由 Terraform 的 HTTP 后端访问。任务结束后终止后端进程。构建和提交身份配置见 [后端说明](../backend/README.md)。
 
 私有状态仓库的文件：
 

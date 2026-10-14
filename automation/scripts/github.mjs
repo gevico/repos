@@ -3,7 +3,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { Octokit } from '@octokit/rest';
 import { retry } from '@octokit/plugin-retry';
-import { root, parseYaml, validateRequest, loadPolicy, effectiveAccess, isRepositoryDocumentation } from './config.mjs';
+import { root, parseYaml, validateRequest, loadPolicy, effectiveAccess, isRepositoryRequest } from './config.mjs';
 
 const Client = Octokit.plugin(retry);
 export function github(token = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN) {
@@ -28,11 +28,7 @@ export async function remoteCatalog(client, owner, repo, ref, directory) {
   await fs.mkdir(path.join(directory, 'repositories'), { recursive: true });
   for (const entry of tree.tree.filter((item) => item.path.startsWith('repositories/'))) {
     if (entry.path === 'repositories/.gitkeep' && entry.type === 'blob' && entry.mode === '100644') continue;
-    if (isRepositoryDocumentation(entry.path)) {
-      if (entry.type !== 'tree' && (entry.type !== 'blob' || entry.mode !== '100644')) throw new Error(`${entry.path}: documentation must use ordinary files and directories`);
-      continue;
-    }
-    if (!/^repositories\/[a-z0-9]+(?:-[a-z0-9]+)*\.yaml$/.test(entry.path) || entry.type !== 'blob' || entry.mode !== '100644') {
+    if (!isRepositoryRequest(entry.path) || entry.type !== 'blob' || entry.mode !== '100644') {
       throw new Error(`${entry.path}: request files must be ordinary YAML files`);
     }
     if (entry.size > 65_536) throw new Error(`${entry.path}: file exceeds 64 KiB`);

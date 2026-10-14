@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { root, engine, work, loadCatalog, loadPolicy, checkTransition, changedNames, digest, writeJson, isRepositoryDocumentation } from './config.mjs';
+import { root, engine, work, loadCatalog, loadPolicy, checkTransition, changedNames, digest, writeJson, isRepositoryRequest } from './config.mjs';
 import { github, remoteCatalog, inspectCatalog, verifyCatalog, comment, status } from './github.mjs';
 import { StateStore } from './state.mjs';
 import { prepareTerraform, terraformPlan, terraformApply } from './runtime.mjs';
@@ -29,15 +29,15 @@ async function request() {
   const head = pullRequest.head.sha;
   await status(control, owner, repo, head, 'pending', 'Validating repository request', 'request/check');
   const files = await control.paginate(control.rest.pulls.listFiles, { owner, repo, pull_number: number });
-  const requests = files.filter((file) => file.filename.startsWith('repositories/') && !isRepositoryDocumentation(file.filename));
+  const requests = files.filter((file) => isRepositoryRequest(file.filename));
   if (!requests.length) {
     await status(control, owner, repo, head, 'success', 'Maintenance PR; repository requests unchanged', 'request/check');
     return;
   }
-  if (files.some((file) => !file.filename.startsWith('repositories/') || isRepositoryDocumentation(file.filename))) throw new Error('Repository requests must be submitted separately from management code, policy or documentation changes');
+  if (files.some((file) => !isRepositoryRequest(file.filename) && !(file.filename === 'repositories/.gitkeep' && file.status === 'removed'))) throw new Error('Repository requests must be submitted separately from management code, policy or documentation changes');
   if (requests.some((file) => ['removed', 'renamed'].includes(file.status))) throw new Error('Removing or renaming repository requests is prohibited');
   if (process.env.GITHUB_SHA !== pullRequest.base.sha) throw new Error('Trusted workflow source differs from the current PR base; rerun Request on main');
-  if (process.env.AUTOMATION_ENABLED !== 'true') throw new Error('Organization automation is not configured; administrator must complete repositories/docs/setup.md');
+  if (process.env.AUTOMATION_ENABLED !== 'true') throw new Error('Organization automation is not configured; administrator must complete automation/docs/setup.md');
   const reader = github();
   const before = await remoteCatalog(control, owner, repo, pullRequest.base.sha, path.join(work, 'base'));
   const after = await remoteCatalog(control, owner, repo, head, path.join(work, 'head'));
@@ -65,7 +65,7 @@ async function request() {
 async function apply() {
   const { policy, owner, repo } = await input();
   if (process.env.GITHUB_REF !== 'refs/heads/main') throw new Error('Apply is restricted to main');
-  if (process.env.AUTOMATION_ENABLED !== 'true') throw new Error('Organization automation is not configured; administrator must complete repositories/docs/setup.md');
+  if (process.env.AUTOMATION_ENABLED !== 'true') throw new Error('Organization automation is not configured; administrator must complete automation/docs/setup.md');
   const client = github();
   control = github(process.env.CONTROL_TOKEN);
   const sha = process.env.GITHUB_SHA;
@@ -129,7 +129,7 @@ try {
   if (pullRequest && control) {
     const policy = await loadPolicy();
     if (command === 'request') await status(control, policy.organization, policy.management_repository, pullRequest.head.sha, 'failure', error.message, 'request/check').catch(() => {});
-    await comment(control, policy.organization, policy.management_repository, pullRequest.number, `### ${command === 'request' ? 'Request validation' : 'Repository automation'} failed\n\n${error.message}\n\nInspect the Actions run and [recovery guide](https://github.com/gevico/repos/blob/main/repositories/docs/operations.md).`).catch(() => {});
+    await comment(control, policy.organization, policy.management_repository, pullRequest.number, `### ${command === 'request' ? 'Request validation' : 'Repository automation'} failed\n\n${error.message}\n\nInspect the Actions run and [recovery guide](https://github.com/gevico/repos/blob/main/automation/docs/operations.md).`).catch(() => {});
   }
   process.exitCode = 1;
 } finally {

@@ -6,6 +6,6 @@ The application runs in GitHub-hosted Actions. GitHub resource changes use Terra
 
 Repository skills live in `.agents/skills/`. The `repo-request` skill creates a local request and validates it. Publishing a PR requires the user's instruction to submit it.
 
-Implementation files and dependencies live in `automation/`. Repository declarations and user documentation live in `repositories/`. Keep `.github/` and `.agents/` at the checkout root for discovery. Commands in documentation run from the checkout root.
+Implementation files, dependencies and documentation live in `automation/`. The `repositories/` directory contains only actual repository declaration YAML files. Keep `.github/` and `.agents/` at the checkout root for discovery. Commands in documentation run from the checkout root.
 
 Use `npm --prefix automation run check` for local validation. Use `terraform -chdir=automation/terraform fmt -check` and `terraform -chdir=automation/terraform validate` for Terraform changes. Real GitHub integration checks use explicitly identified resources; report the actual result.

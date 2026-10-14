@@ -10,7 +10,7 @@
 
 ## 目录和仓库 skill
 
-一级可见目录为 `automation/` 和 `repositories/`。实现、依赖、政策、Schema、Terraform 和测试位于 `automation/`；申请 YAML 和使用文档位于 `repositories/`。GitHub Actions 与仓库 skill 的入口保留在 `.github/` 和 `.agents/`。
+一级目录职责为：`automation/` 保存实现、依赖、政策、Schema、Terraform、测试和全部使用文档；`repositories/` 只保存实际仓库申请 YAML。GitHub Actions 与仓库 skill 的入口保留在 `.github/` 和 `.agents/`，项目入口 README 保留在根目录。
 
 已执行 `repo-request` 的配置生成步骤：生成公开仓库声明，指定真实用户 `zevorn` 和真实团队 `ai_infra-pigpig-runrun`，通过 Schema、政策和 GitHub 在线校验。CLI 从实现目录执行时，仍按项目根目录解析申请目录和输出路径。
 

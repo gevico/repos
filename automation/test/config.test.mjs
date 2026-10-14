@@ -54,15 +54,18 @@ test('catalog loading rejects symlinked requests and unrelated files', async () 
   const file = path.join(directory, 'repositories/coach.yaml');
   try {
     await fs.writeFile(file, requestYaml(request));
-    await fs.writeFile(path.join(directory, 'repositories/README.md'), '# Repository requests\n');
-    await fs.mkdir(path.join(directory, 'repositories/docs'));
-    await fs.writeFile(path.join(directory, 'repositories/docs/requesting.md'), '# Requesting a repository\n');
     assert.deepEqual((await loadCatalog(directory)).catalog.coach, request);
     const output = path.join(directory, 'rendered.json');
     await execute(process.execPath, [path.join(engine, 'scripts/repos.mjs'), 'render', '--directory', path.relative(root, directory), '--output', path.relative(root, output)], { cwd: engine });
     const rendered = JSON.parse(await fs.readFile(output, 'utf8'));
     assert.equal(rendered.repositories.coach.description, request.description);
     assert.deepEqual(rendered.repositories.coach.teams, request.access.teams);
+    await fs.writeFile(path.join(directory, 'repositories/README.md'), '# Repository requests\n');
+    await assert.rejects(loadCatalog(directory), /ordinary/);
+    await fs.unlink(path.join(directory, 'repositories/README.md'));
+    await fs.mkdir(path.join(directory, 'repositories/docs'));
+    await assert.rejects(loadCatalog(directory), /ordinary/);
+    await fs.rmdir(path.join(directory, 'repositories/docs'));
     await fs.rename(file, path.join(directory, 'original.yaml'));
     await fs.symlink(path.join(directory, 'original.yaml'), file);
     await assert.rejects(loadCatalog(directory), /ordinary/);
@@ -72,4 +75,22 @@ test('catalog loading rejects symlinked requests and unrelated files', async () 
   } finally {
     await fs.rm(directory, { recursive: true, force: true });
   }
+});
+
+test('a checkout without declarations has an empty catalog and retains its organization policy', async () => {
+  await fs.mkdir(path.join(work, 'tests'), { recursive: true });
+  const directory = await fs.mkdtemp(path.join(work, 'tests/empty-catalog-'));
+  try {
+    const loaded = await loadCatalog(directory);
+    assert.deepEqual(loaded.catalog, {});
+    assert.equal(loaded.policy.organization, 'gevico');
+    assert.deepEqual(loaded.policy.administrator_users, policy.administrator_users);
+    const output = path.join(directory, 'rendered.json');
+    await execute(process.execPath, [path.join(engine, 'scripts/repos.mjs'), 'render', '--directory', path.relative(root, directory), '--output', path.relative(root, output)], { cwd: engine });
+    const rendered = JSON.parse(await fs.readFile(output, 'utf8'));
+    assert.equal(rendered.organization, 'gevico');
+    assert.deepEqual(rendered.repositories, {});
+    assert.equal(rendered.require_pull_request_reviews, policy.require_pull_request_reviews);
+    await assert.rejects(loadCatalog(path.join(directory, 'missing-root')), /ENOENT/);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
