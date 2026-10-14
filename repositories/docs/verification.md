@@ -4,9 +4,15 @@
 
 ## GitHub Actions
 
-[Check 执行记录](https://github.com/gevico/repos/actions/runs/38444944014) 在 GitHub 托管 Linux runner 上完成配置校验、程序测试、Git 后端构建、Terraform 格式与配置检查。
+[Check 执行记录](https://github.com/gevico/repos/actions/runs/38496289498) 在 GitHub 托管 Linux runner 上完成配置校验、程序测试、Git 后端构建、Terraform 格式与配置检查。
 
-该任务上传真实的 age 加密 artifact，通过认证的 GitHub REST API 下载，核验 SHA-256 摘要，并解密核对该任务的提交 SHA、运行 ID 和政策摘要。检查使用任务内生成的独立加密密钥。
+该任务从 `automation/` 安装依赖并执行管理程序，上传真实的 age 加密 artifact，通过认证的 GitHub REST API 下载，核验 SHA-256 摘要，并解密核对该任务的提交 SHA、运行 ID 和政策摘要。检查使用任务内生成的独立加密密钥。
+
+## 目录和仓库 skill
+
+一级可见目录为 `automation/` 和 `repositories/`。实现、依赖、政策、Schema、Terraform 和测试位于 `automation/`；申请 YAML 和使用文档位于 `repositories/`。GitHub Actions 与仓库 skill 的入口保留在 `.github/` 和 `.agents/`。
+
+已执行 `repo-request` 的配置生成步骤：生成公开仓库声明，指定真实用户 `zevorn` 和真实团队 `ai_infra-pigpig-runrun`，通过 Schema、政策和 GitHub 在线校验。CLI 从实现目录执行时，仍按项目根目录解析申请目录和输出路径。
 
 ## 真实 GitHub 资源
 
@@ -23,7 +29,7 @@
 - 两个独立后端进程竞争同一远程锁，第二个进程返回 HTTP 409 和当前锁 ID；验证结束后锁被释放。
 - 状态提交使用实际 Git 配置中的姓名和邮箱，包含 `Signed-off-by`。
 
-验证资源使用独立状态路径 `integration/20261014/terraform.tfstate`。该仓库用于集成验证，申请目录 `repositories/` 保持为空。
+验证资源使用独立状态路径 `integration/20261014/terraform.tfstate`。该仓库用于集成验证，申请目录中的生产声明保持为空。
 
 ## 生产流程的运行条件
 
