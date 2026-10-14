@@ -1,0 +1,9 @@
+name: Repository automation
+description: Run trusted repository automation with the GitHub Actions artifact runtime
+inputs:
+  command:
+    description: request or apply
+    required: true
+runs:
+  using: node24
+  main: index.mjs

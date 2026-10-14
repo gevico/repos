@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   validate:
@@ -26,14 +27,25 @@ jobs:
           terraform_version: 1.12.2
           terraform_wrapper: false
       - run: mkdir -p .work/tmp
-      - run: npm ci --no-fund --no-audit
+      - uses: actions/setup-go@90ad2b35f69faf97585ad74d28fa006d2739b7af # v6
+        with:
+          go-version: '1.26.3'
+          cache: false
+      - run: npm --prefix automation ci --no-fund --no-audit
         env:
           TMPDIR: ${{ github.workspace }}/.work/tmp
-      - run: npm run check
+      - run: npm --prefix automation run check
         env:
           TMPDIR: ${{ github.workspace }}/.work/tmp
-      - run: terraform -chdir=terraform fmt -check
-      - run: terraform -chdir=terraform init -backend=false -input=false -lockfile=readonly
+      - run: npm --prefix automation run backend:build
         env:
           TMPDIR: ${{ github.workspace }}/.work/tmp
-      - run: terraform -chdir=terraform validate
+      - uses: ./.github/actions/check-artifact
+        env:
+          CONTROL_TOKEN: ${{ github.token }}
+          TMPDIR: ${{ github.workspace }}/.work/tmp
+      - run: terraform -chdir=automation/terraform fmt -check
+      - run: terraform -chdir=automation/terraform init -backend=false -input=false -lockfile=readonly
+        env:
+          TMPDIR: ${{ github.workspace }}/.work/tmp
+      - run: terraform -chdir=automation/terraform validate

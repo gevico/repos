@@ -1,0 +1,32 @@
+{
+  "name": "@gevico/repos",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "validate": "node scripts/repos.mjs validate",
+    "request": "node scripts/repos.mjs request",
+    "test": "node --test --test-concurrency=1",
+    "check": "npm run validate && npm test",
+    "ci:request": "node scripts/ci.mjs request",
+    "ci:apply": "node scripts/ci.mjs apply",
+    "ci:verify": "node scripts/ci.mjs verify",
+    "bootstrap": "node scripts/bootstrap.mjs",
+    "backend:build": "node scripts/build-backend.mjs",
+    "state:setup": "node scripts/setup-state.mjs",
+    "backend:check": "node scripts/check-backend.mjs"
+  },
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/artifact": "^6.3.1",
+    "age-encryption": "^0.3.1",
+    "@octokit/rest": "^22.0.0",
+    "@octokit/plugin-retry": "^8.0.0",
+    "ajv": "^8.17.1",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "markdown-it": "^14.1.0"
+  }
+}

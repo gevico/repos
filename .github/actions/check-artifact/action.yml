@@ -1,0 +1,5 @@
+name: Check encrypted artifact transport
+description: Verify real Actions artifact upload, REST download and age decryption
+runs:
+  using: node24
+  main: index.mjs

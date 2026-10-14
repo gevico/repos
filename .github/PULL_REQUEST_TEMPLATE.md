@@ -8,5 +8,5 @@ Explain the requested user and team permissions, including any permissions being
 
 ## Validation
 
-- [ ] The request passes `npm run validate`.
+- [ ] The request passes `npm --prefix automation run validate`.
 - [ ] The configuration and Actions preview describe the intended changes.

@@ -15,7 +15,7 @@ permissions:
   contents: read
   pull-requests: write
   statuses: write
-  id-token: write
+  actions: read
 
 concurrency:
   group: request-${{ github.event.pull_request.number || inputs.pull_request }}
@@ -29,8 +29,9 @@ jobs:
     timeout-minutes: 30
     env:
       AUTOMATION_ENABLED: ${{ vars.AUTOMATION_ENABLED }}
-      STATE_BUCKET: ${{ vars.STATE_BUCKET }}
-      AWS_REGION: ${{ vars.AWS_REGION }}
+      STATE_AGE_RECIPIENT: ${{ vars.STATE_AGE_RECIPIENT }}
+      STATE_GIT_NAME: ${{ vars.STATE_GIT_NAME }}
+      STATE_GIT_EMAIL: ${{ vars.STATE_GIT_EMAIL }}
       TF_IN_AUTOMATION: 'true'
       TF_INPUT: '0'
     steps:
@@ -46,7 +47,16 @@ jobs:
           terraform_version: 1.12.2
           terraform_wrapper: false
       - run: mkdir -p .work/tmp
-      - run: npm ci --no-fund --no-audit --ignore-scripts
+      - uses: actions/setup-go@90ad2b35f69faf97585ad74d28fa006d2739b7af # v6
+        if: vars.AUTOMATION_ENABLED == 'true'
+        with:
+          go-version: '1.26.3'
+          cache: false
+      - run: npm --prefix automation ci --no-fund --no-audit --ignore-scripts
+        env:
+          TMPDIR: ${{ github.workspace }}/.work/tmp
+      - run: npm --prefix automation run backend:build
+        if: vars.AUTOMATION_ENABLED == 'true'
         env:
           TMPDIR: ${{ github.workspace }}/.work/tmp
       - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
@@ -59,14 +69,12 @@ jobs:
           permission-administration: read
           permission-contents: read
           permission-members: read
-      - uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5
-        if: vars.AUTOMATION_ENABLED == 'true'
+      - uses: ./.github/actions/automation
         with:
-          role-to-assume: ${{ vars.AWS_PREVIEW_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
-      - run: npm run ci:request
+          command: request
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
           GITHUB_TOKEN: ${{ steps.app.outputs.token }}
           CONTROL_TOKEN: ${{ github.token }}
+          STATE_AGE_KEY: ${{ secrets.STATE_AGE_KEY }}
           TMPDIR: ${{ github.workspace }}/.work/tmp
