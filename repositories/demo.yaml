@@ -1,0 +1,8 @@
+name: demo
+description: 仓库创建流程测试
+visibility: public
+topics: []
+access:
+  users:
+    zevorn: admin
+  teams: {}
