@@ -48,7 +48,7 @@ function consistentPartial(current, before, after) {
     .every((key) => consistentPartial(current[key] ?? null, before[key] ?? null, after[key] ?? null));
 }
 
-export function authorizePlan(plan, catalog, policy, allowedNames, approval = null, { allowMigration = false, lifecycle = false, forkIds = {} } = {}) {
+export function authorizePlan(plan, catalog, policy, allowedNames, approval = null, { allowMigration = false, lifecycle = false, initializedIds = {} } = {}) {
   const intents = [];
   for (const resource of plan.resource_changes ?? []) {
     const actions = resource.change.actions;
@@ -61,7 +61,7 @@ export function authorizePlan(plan, catalog, policy, allowedNames, approval = nu
     const request = catalog[name];
     const expectedResource = resource.type === 'github_repository_file' ? 'readme' : resource.type === 'github_repository' && repositoryMode(request) === 'existing' ? 'existing' : 'managed';
     if (resource.name !== expectedResource) throw new Error(`Unexpected Terraform resource: ${resource.address}`);
-    if (importing && (!['existing', 'fork'].includes(repositoryMode(request)) || importing !== name || resource.type === 'github_repository_file')) throw new Error(`Unexpected import target: ${resource.address}`);
+    if (importing && (!['existing', 'fork', 'mirror'].includes(repositoryMode(request)) || importing !== name || resource.type === 'github_repository_file')) throw new Error(`Unexpected import target: ${resource.address}`);
     const rawBefore = resource.change.before;
     const rawAfter = resource.change.after;
     const migration = allowMigration && resource.type === 'github_repository' && actions[0] === 'update' && rawBefore.archive_on_destroy === true && (rawAfter.archive_on_destroy ?? false) === false &&
@@ -103,10 +103,10 @@ export function authorizePlan(plan, catalog, policy, allowedNames, approval = nu
     const intent = { address: resource.address, type: resource.type, name, actions, before, after, ...(importing ? { importing } : {}) };
     if (approval && !migration) {
       const reviewed = approval.find((item) => item.address === intent.address);
-      const initializedFork = repositoryMode(request) === 'fork' && forkIds[name] && reviewed?.actions[0] === 'create' && (resource.type !== 'github_repository' || after.repo_id === forkIds[name]);
-      const comparable = initializedFork && resource.type === 'github_repository' ? { ...after, repo_id: reviewed.after.repo_id } : after;
+      const initialized = ['fork', 'mirror'].includes(repositoryMode(request)) && initializedIds[name] && reviewed?.actions[0] === 'create' && (resource.type !== 'github_repository' || after.repo_id === initializedIds[name]);
+      const comparable = initialized && resource.type === 'github_repository' ? { ...after, repo_id: reviewed.after.repo_id } : after;
       const reviewedAfter = reviewed?.after && resource.type === 'github_repository' ? { ...reviewed.after, topics: [...(reviewed.after.topics ?? [])].sort() } : reviewed?.after;
-      if (!reviewed || (!initializedFork && stableJson(reviewed.actions) !== stableJson(actions)) || stableJson(reviewedAfter) !== stableJson(comparable) || (!initializedFork && (!consistentPartial(before, reviewed.before, reviewedAfter) || (importing && reviewed.importing !== importing)))) throw new Error(`Live changes differ from the reviewed plan: ${name}; refresh the PR preview`);
+      if (!reviewed || (!initialized && stableJson(reviewed.actions) !== stableJson(actions)) || stableJson(reviewedAfter) !== stableJson(comparable) || (!initialized && (!consistentPartial(before, reviewed.before, reviewedAfter) || (importing && reviewed.importing !== importing)))) throw new Error(`Live changes differ from the reviewed plan: ${name}; refresh the PR preview`);
     }
     intents.push(intent);
   }

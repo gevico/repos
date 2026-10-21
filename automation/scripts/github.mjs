@@ -60,7 +60,7 @@ export async function inspectCatalog(client, catalog, policy, state = null, reco
     const repository = await findRepository(client, policy.organization, request.name);
     if (repository && repository.name !== request.name) throw new Error(`${request.name}: use the canonical GitHub repository name ${repository.name}`);
     if (repository && expectedId && repository.id !== expectedId) throw new Error(`${request.name}: repository ID differs from GitHub; same-name replacement is prohibited`);
-    const importing = repositoryMode(request) === 'existing' && request.repository_id || repositoryMode(request) === 'fork' && recorded?.origin === 'fork-init';
+    const importing = repositoryMode(request) === 'existing' && request.repository_id || ['fork', 'mirror'].includes(repositoryMode(request)) && recorded?.origin === `${repositoryMode(request)}-init`;
     if (state && repository && !tracked && !importing) throw new Error(`${request.name}: name already exists outside Terraform state; administrator import required`);
     if (recorded?.status === 'deleted' && repository) throw new Error(`${request.name}: a repository has reappeared after deletion`);
     if (!repository && expectedId) {

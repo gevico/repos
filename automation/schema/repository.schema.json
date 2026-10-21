@@ -6,13 +6,13 @@
   "required": ["name", "description", "visibility", "access"],
   "properties": {
     "name": { "type": "string", "minLength": 1, "maxLength": 100, "pattern": "^[A-Za-z0-9_.-]+$", "not": { "enum": [".", ".."] } },
-    "mode": { "enum": ["create", "existing", "fork"] },
+    "mode": { "enum": ["create", "existing", "fork", "mirror"] },
     "status": { "enum": ["active", "archived", "deleted"] },
     "repository_id": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
     "description": { "type": "string", "maxLength": 350 },
     "default_branch": { "type": "string", "minLength": 1, "maxLength": 255 },
     "readme_template": { "enum": ["project", "library", "minimal"] },
-    "license": { "enum": ["mit", "apache-2.0", "bsd-2-clause", "bsd-3-clause", "gpl-2.0", "gpl-3.0", "lgpl-3.0", "agpl-3.0", "mpl-2.0", "unlicense", "cc0-1.0"] },
+    "license": { "enum": ["agpl-3.0", "apache-2.0", "bsd-2-clause", "bsd-3-clause", "bsl-1.0", "cc0-1.0", "epl-2.0", "gpl-2.0", "gpl-3.0", "lgpl-2.1", "mit", "mpl-2.0", "unlicense"] },
     "fork": {
       "type": "object", "additionalProperties": false,
       "required": ["owner", "repository", "source_repository_id"],
@@ -21,6 +21,14 @@
         "repository": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "not": { "enum": [".", ".."] } },
         "source_repository_id": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
         "default_branch_only": { "type": "boolean" }
+      }
+    },
+    "mirror": {
+      "type": "object", "additionalProperties": false,
+      "required": ["url"],
+      "properties": {
+        "url": { "type": "string", "maxLength": 2048, "pattern": "^https://[a-z0-9.-]+(?:/[A-Za-z0-9_.~-]+)+$" },
+        "source_repository_id": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
       }
     },
     "visibility": { "enum": ["public", "private"] },

@@ -53,16 +53,30 @@ export async function loadPolicy(directory = engine) {
   if (!policy.administrator_users?.length && !policy.administrator_teams?.length) {
     throw new Error('policy.yml must define repository administrators');
   }
-  for (const key of ['administrator_users', 'administrator_teams', 'allowed_teams', 'allowed_templates', 'reserved_names']) {
+  for (const key of ['administrator_users', 'administrator_teams', 'allowed_teams', 'allowed_templates', 'allowed_mirror_hosts', 'allowed_licenses', 'reserved_names']) {
     if (!Array.isArray(policy[key]) || policy[key].some((item) => typeof item !== 'string')) {
       throw new Error(`policy.yml: ${key} must be an array of strings`);
     }
   }
+  const licenses = JSON.parse(await fs.readFile(path.join(engine, 'schema/repository.schema.json'), 'utf8')).properties.license.enum;
+  if (policy.allowed_licenses.some((key) => !licenses.includes(key))) throw new Error('policy.yml: allowed_licenses must use GitHub license keys from repository.schema.json');
   if (policy.default_branch !== 'main' || typeof policy.private_branch_protection !== 'boolean' || typeof policy.require_pull_request_reviews !== 'boolean') {
     throw new Error('policy.yml: invalid branch policy');
   }
   for (const [name, users] of Object.entries(policy.protected_repository_users ?? {})) if (!Array.isArray(users) || users.some((user) => typeof user !== 'string')) throw new Error(`policy.yml: invalid protected users for ${name}`);
   return policy;
+}
+
+export function mirrorSource(url, policy, label = 'mirror') {
+  let source;
+  try { source = new URL(url); } catch { throw new Error(`${label}: mirror url must be an absolute HTTPS URL`); }
+  if (source.href !== url || source.protocol !== 'https:' || source.username || source.password || source.port || source.search || source.hash) throw new Error(`${label}: mirror url must be a canonical HTTPS URL without credentials, port, query or fragment`);
+  if (!url.endsWith('.git')) throw new Error(`${label}: mirror url must be the source clone URL ending in .git`);
+  if (!policy.allowed_mirror_hosts.includes(source.hostname)) throw new Error(`${label}: mirror host ${source.hostname} is not allowed by policy.yml`);
+  if (source.hostname !== 'github.com') return { url, host: source.hostname };
+  const match = source.pathname.match(/^\/([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)\/([A-Za-z0-9_.-]+)\.git$/);
+  if (!match || ['.', '..'].includes(match[2])) throw new Error(`${label}: GitHub mirror sources use https://github.com/owner/repository.git`);
+  return { url, host: source.hostname, owner: match[1], repository: match[2] };
 }
 
 export async function validator() {
@@ -81,6 +95,13 @@ export async function validateRequest(request, policy, filename) {
   if (mode !== 'existing' && !request.description.trim()) throw new Error(`${filename}: description must describe the repository purpose`);
   if (mode === 'existing' && !request.repository_id) throw new Error(`${filename}: existing repository requests require repository_id`);
   if ((mode === 'fork') !== Boolean(request.fork)) throw new Error(`${filename}: fork source is required only for mode fork`);
+  if ((mode === 'mirror') !== Boolean(request.mirror)) throw new Error(`${filename}: mirror source is required only for mode mirror`);
+  if (mode === 'mirror') {
+    const source = mirrorSource(request.mirror.url, policy, filename);
+    if ((source.host === 'github.com') !== Boolean(request.mirror.source_repository_id)) throw new Error(`${filename}: source_repository_id is required only for GitHub mirror sources`);
+    if (!request.default_branch) throw new Error(`${filename}: mirror requests require the source default_branch`);
+    if (request.readme_template) throw new Error(`${filename}: mirror repositories keep the source content; README templates initialize new repositories`);
+  }
   if (request.template && mode !== 'create') throw new Error(`${filename}: repository templates require mode create`);
   if (request.license && (mode !== 'create' || request.template)) throw new Error(`${filename}: license selection requires a new repository without a repository template`);
   if (request.readme_template && mode === 'existing') throw new Error(`${filename}: existing requests manage access and lifecycle; README templates initialize new repositories`);
@@ -152,7 +173,7 @@ export function effectiveAccess(request, policy) {
   return { users, teams };
 }
 
-export function checkTransition(before, after) {
+export function checkTransition(before, after, policy) {
   let lifecycle = false;
   for (const name of Object.keys(before)) {
     if (!after[name]) throw new Error(`${name}: removing or renaming a managed repository is prohibited`);
@@ -160,7 +181,7 @@ export function checkTransition(before, after) {
     const previous = before[name];
     const desired = after[name];
     if (repositoryMode(previous) !== repositoryMode(desired)) throw new Error(`${name}: repository mode is immutable`);
-    for (const field of ['fork', 'readme_template', 'license', 'default_branch']) if (stableJson(previous[field] ?? null) !== stableJson(desired[field] ?? null)) throw new Error(`${name}: ${field} is immutable after registration`);
+    for (const field of ['fork', 'mirror', 'readme_template', 'license', 'default_branch']) if (stableJson(previous[field] ?? null) !== stableJson(desired[field] ?? null)) throw new Error(`${name}: ${field} is immutable after registration`);
     if (previous.repository_id && previous.repository_id !== desired.repository_id) throw new Error(`${name}: repository_id is immutable after registration`);
     if (repositoryStatus(previous) === 'deleted' && stableJson(previous) !== stableJson(desired)) throw new Error(`${name}: a deleted declaration is immutable`);
     if (repositoryStatus(previous) !== repositoryStatus(desired)) lifecycle = true;
@@ -171,7 +192,10 @@ export function checkTransition(before, after) {
     }
   }
   for (const [name, request] of Object.entries(after)) {
-    if (!before[name] && (repositoryStatus(request) !== 'active' || (repositoryMode(request) !== 'existing' && request.repository_id))) throw new Error(`${name}: new declarations must be active and use repository_id only for mode existing`);
+    if (before[name]) continue;
+    if (repositoryStatus(request) !== 'active' || (repositoryMode(request) !== 'existing' && request.repository_id)) throw new Error(`${name}: new declarations must be active and use repository_id only for mode existing`);
+    // Registered repositories keep their license after the allowed list changes.
+    if (request.license && !policy.allowed_licenses.includes(request.license)) throw new Error(`${name}: license ${request.license} is not allowed by policy.yml`);
   }
   if (lifecycle && changedNames(before, after).some((name) => !before[name] || repositoryStatus(before[name]) === repositoryStatus(after[name]))) throw new Error('Lifecycle requests must be submitted separately from creation or configuration changes');
   return { lifecycle };

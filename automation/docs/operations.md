@@ -51,3 +51,11 @@ PR 审核 artifact 保留 90 天。合并前记录过期时，重新运行 Reque
 Credentials 每天检查 `FORK_USER_TOKEN`。身份或组织权限检查失败时，在管理仓库创建带 `@zevorn` 的 Issue；Apply 遇到相同凭证错误也使用该 Issue。更新 production secret 后运行 Credentials，核验成功会关闭对应提醒。GitHub 限流、网络错误和来源仓库政策错误按实际错误处理。
 
 Fork 初始化请求和返回的数字 ID 加密保存到 `records/forks/<PR>/<head>/<name>.json.age`。重复执行只接续同一审核申请和已记录的 ID。API 请求已经发出而返回 ID 尚未保存时，需要管理员核实该次创建结果并修复记录，避免接受同名的未登记仓库。
+
+## 镜像初始化
+
+镜像初始化的阶段加密保存到 `records/mirrors/<PR>/<head>/<name>.json.age`。`requested` 表示即将创建仓库；`created` 记录返回的仓库 ID；`copied` 表示已经关闭 GitHub Actions、推送预览中的分支和标签，并设置了默认分支。重新运行同一已批准提交的 Apply 时，程序从记录的阶段继续，再次推送相同提交不会改变目标仓库。
+
+创建请求已经发出而 ID 尚未保存时，同名仓库没有对应记录，Apply 停止，需要管理员核实该仓库并修复记录。来源在预览之后改写或删除了预览中的提交时，Apply 在推送前停止，目标仓库保持为空并保留已记录的 ID，由管理员核实后处理。推送超过 GitHub 的 2 GB 上限时，Apply 报告推送错误。
+
+Apply 完成后，程序核对目标仓库的分支和标签与预览快照一致，并确认 GitHub Actions 处于关闭状态。

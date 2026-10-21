@@ -1,6 +1,6 @@
 ---
 name: repo-request
-description: Generate validated gevico repository YAML from natural language for creation, Fork, existing repository access, archiving, deletion or restoration in a cloned gevico/repos checkout.
+description: Generate validated gevico repository YAML from natural language for creation, Fork, mirror copies, existing repository access, archiving, deletion or restoration in a cloned gevico/repos checkout.
 ---
 
 # Repository request
@@ -11,7 +11,9 @@ Interpret the user's language into a repository name, purpose, visibility, maint
 
 Use explicit GitHub usernames and existing team slugs. When the requester should maintain the repository, resolve their username with `gh api user --jq .login` if authenticated. Ask for any necessary missing identity or ambiguous permission; never invent a person, team, or authorization. Read private-repository capability and allowed teams/templates from the actual policy.
 
-For a new repository, use `node automation/scripts/repos.mjs request` with the extracted fields. `--readme-template` selects `project`, `library` or `minimal`; `--license` takes a GitHub license key such as `mit` or `apache-2.0`. For a Fork, add `--fork owner/repository`; the command reads and binds the real source ID and default branch. Forks inherit their upstream license. Consult [requesting.md](../../../automation/docs/requesting.md) for source and initialization constraints.
+For a new repository, use `node automation/scripts/repos.mjs request` with the extracted fields. `--readme-template` selects `project`, `library` or `minimal`; `--license` takes a key from the policy's `allowed_licenses`. A license is optional and fixed after registration, so when the user has not mentioned one for a new ordinary repository, ask whether they want no license or one of the allowed keys. For a Fork, add `--fork owner/repository`; the command reads and binds the real source ID and default branch. Forks inherit their upstream license. Consult [requesting.md](../../../automation/docs/requesting.md) for source and initialization constraints.
+
+For a one-time copy of an external Git repository, add `--mirror URL` with the source's HTTPS clone URL ending in `.git`; the host must be listed in the policy's `allowed_mirror_hosts`. The command reads the real default branch and, for github.com sources, binds the public source repository ID. A mirror has no fork relationship and does not sync afterwards; it copies the branches and tags shown in the PR preview, starts with GitHub Actions disabled, and keeps the source README and license, so do not add `--readme-template` or `--license`. Use Fork when the user wants the GitHub fork relationship; use mirror for non-GitHub sources or an independent copy.
 
 For an existing GitHub repository without a declaration, use `node automation/scripts/repos.mjs existing --name NAME --user USER:ROLE` or `--team TEAM:ROLE`. It captures the current ID and direct access, then applies the requested changes. `--remove-user` and `--remove-team` revoke explicit assignments. Keep unrelated access entries. This mode preserves repository contents, settings and branch names.
 
@@ -31,6 +33,7 @@ Examples of requests this skill handles:
 - “把这个仓库的 ai_infra-pigpig-runrun 团队权限设置为维护权限，保留其他授权。”
 - “给已有的 GW100 仓库申请 bbbbbq 的管理权限。”
 - “Fork octocat/Hello-World 到 gevico，仓库叫 hello-world-study，由我维护。”
+- “把 https://gitlab.com/qemu-project/qemu.git 镜像到 gevico，仓库叫 qemu-mirror，由我维护。”
 - “把 demo 归档。”
 - “删除 demo，把申请 YAML 保存在归档目录。”
 
