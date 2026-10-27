@@ -1,7 +1,9 @@
 name: gw100-references
 description: GW100 架构调研资料：数据流 AI 芯片与端侧 NPU 的论文、讲稿、官方文档及阅读笔记
 visibility: public
-topics: []
+topics:
+  - gw100
+  - research
 access:
   users:
     bbbbbq: admin
