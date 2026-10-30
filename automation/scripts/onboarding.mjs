@@ -24,7 +24,7 @@ export async function importTargets(client, catalog, state) {
   for (const request of Object.values(catalog)) {
     if (repositoryStatus(request) === 'deleted') continue;
     const mode = repositoryMode(request);
-    if (!['existing', 'fork'].includes(mode)) continue;
+    if (!['existing', 'fork', 'mirror'].includes(mode)) continue;
     const repository = await findRepository(client, 'gevico', request.name);
     if (!repository) {
       if (mode === 'existing') throw new Error(`${request.name}: existing repository is unavailable`);
@@ -34,7 +34,7 @@ export async function importTargets(client, catalog, state) {
     const resourceName = mode === 'existing' ? 'existing' : 'managed';
     if (!state.addresses.has(`github_repository.${resourceName}[${JSON.stringify(name)}]`)) imports[mode === 'existing' ? 'existing' : 'repository'][name] = name;
     if (!state.addresses.has(`github_repository_collaborators.managed[${JSON.stringify(name)}]`)) imports.collaborators[name] = name;
-    if (mode === 'fork' && !state.addresses.has(`github_branch_default.managed[${JSON.stringify(name)}]`)) imports.branch[name] = name;
+    if (mode !== 'existing' && !state.addresses.has(`github_branch_default.managed[${JSON.stringify(name)}]`)) imports.branch[name] = name;
   }
   return imports;
 }

@@ -7,6 +7,21 @@ administrator_teams: []
 allowed_teams:
   - ai_infra-pigpig-runrun
 allowed_templates: []
+allowed_licenses:
+  - mit
+  - apache-2.0
+  - bsd-2-clause
+  - bsd-3-clause
+  - gpl-2.0
+  - gpl-3.0
+  - lgpl-2.1
+  - mpl-2.0
+  - cc0-1.0
+allowed_mirror_hosts:
+  - github.com
+  - gitlab.com
+  - git.kernel.org
+  - gitee.com
 reserved_names:
   - repos
   - repos-state

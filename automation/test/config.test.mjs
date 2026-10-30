@@ -82,10 +82,29 @@ test('configuration rejects ambiguous YAML and permission policy changes', async
 
 test('managed identity remains stable while explicit team permissions can be revoked', async () => {
   const updated = { ...request, access: { users: { zevorn: 'admin' }, teams: {} } };
-  checkTransition({ coach: request }, { coach: updated });
+  checkTransition({ coach: request }, { coach: updated }, policy);
   assert.deepEqual(effectiveAccess(updated, policy).teams, {});
-  assert.throws(() => checkTransition({ coach: request }, {}), /removing or renaming/);
-  assert.throws(() => checkTransition({ coach: request }, { coach: { ...request, template: { owner: 'gevico', repository: 'coach' } } }), /immutable/);
+  assert.throws(() => checkTransition({ coach: request }, {}, policy), /removing or renaming/);
+  assert.throws(() => checkTransition({ coach: request }, { coach: { ...request, template: { owner: 'gevico', repository: 'coach' } } }, policy), /immutable/);
+});
+
+test('new repositories choose no license or one from the policy allowed list', async () => {
+  checkTransition({}, { coach: request }, policy);
+  const licensed = { ...request, license: 'lgpl-2.1' };
+  await validateRequest(licensed, policy, 'coach.yaml');
+  checkTransition({}, { coach: licensed }, policy);
+  assert.throws(() => checkTransition({}, { coach: { ...request, license: 'agpl-3.0' } }, policy), /not allowed by policy/);
+  await assert.rejects(validateRequest({ ...request, license: 'lgpl-3.0' }, policy, 'coach.yaml'), /allowed values/);
+  checkTransition({ coach: licensed }, { coach: { ...licensed, topics: ['qemu', 'plugins'] } }, { ...policy, allowed_licenses: ['mit'] });
+  const { stdout } = await execute(process.execPath, [path.join(engine, 'scripts/repos.mjs'), 'request', '--name', 'coach', '--description', request.description, '--maintainer', 'zevorn', '--license', 'lgpl-2.1'], { cwd: root });
+  assert.equal(parseYaml(stdout, 'coach.yaml').license, 'lgpl-2.1');
+  await assert.rejects(execute(process.execPath, [path.join(engine, 'scripts/repos.mjs'), 'request', '--name', 'coach', '--description', request.description, '--maintainer', 'zevorn', '--license', 'agpl-3.0'], { cwd: root }), /not allowed by policy/);
+  await fs.mkdir(path.join(work, 'tests'), { recursive: true });
+  const directory = await fs.mkdtemp(path.join(work, 'tests/policy-'));
+  try {
+    await fs.writeFile(path.join(directory, 'policy.yml'), requestYaml({ ...policy, allowed_licenses: ['mit', 'wtfpl'] }));
+    await assert.rejects(loadPolicy(directory), /allowed_licenses/);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
 
 test('catalog loading rejects symlinked requests and unrelated files', async () => {

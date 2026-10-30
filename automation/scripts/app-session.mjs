@@ -15,12 +15,13 @@ export class AppSession {
     return session;
   }
 
-  async token(mode = 'read', repositoryIds = null) {
-    if (!['read', 'write'].includes(mode)) throw new Error('Invalid App permission mode');
+  async token(mode = 'read', repositoryIds = null, { workflows = false } = {}) {
+    if (!['read', 'write'].includes(mode) || (workflows && mode !== 'write')) throw new Error('Invalid App permission mode');
     if (mode === 'write' && this.installation.permissions.administration !== 'write') throw new Error('The App is not authorized to write repository administration');
+    if (workflows && this.installation.permissions.workflows !== 'write') throw new Error('Mirror copies require the write App Workflows: write permission');
     const ids = repositoryIds === null ? null : [...new Set(repositoryIds)].sort((a, b) => a - b);
     if (ids && (!ids.length || ids.length > 500 || ids.some((id) => !Number.isSafeInteger(id) || id <= 0))) throw new Error('Scoped installation tokens require 1 to 500 valid repository IDs');
-    const permissions = { administration: mode, contents: mode, members: 'read', metadata: 'read' };
+    const permissions = { administration: mode, contents: mode, members: 'read', metadata: 'read', ...(workflows ? { workflows: 'write' } : {}) };
     const { data } = await this.app.rest.apps.createInstallationAccessToken({ installation_id: this.installation.id, permissions, ...(ids ? { repository_ids: ids } : {}) });
     if (process.env.GITHUB_ACTIONS) setSecret(data.token);
     const client = github(data.token);

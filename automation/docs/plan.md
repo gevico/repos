@@ -2,7 +2,7 @@
 
 ## 目标
 
-在 `gevico` 组织通过 `repos` 处理创建、Fork、已有仓库权限申请、归档、删除和恢复。申请人使用 `repo-request` skill 描述需求，助手生成并校验 YAML。管理员审核并合并 PR 后，GitHub Actions 执行操作并核验结果。新仓库可选择 README 模板和许可证，全部自动操作在 GitHub 托管 runner 中运行。
+在 `gevico` 组织通过 `repos` 处理创建、Fork、镜像复制、已有仓库权限申请、归档、删除和恢复。申请人使用 `repo-request` skill 描述需求，助手生成并校验 YAML。管理员审核并合并 PR 后，GitHub Actions 执行操作并核验结果。新仓库可选择 README 模板和许可证，全部自动操作在 GitHub 托管 runner 中运行。
 
 同一份配置用于后续权限修改和撤销。每次执行保留申请 PR、合并提交、变更预览和 GitHub API 核验结果之间的对应关系。
 
@@ -39,13 +39,14 @@
 - `mode`：创建、已有仓库权限管理或 Fork。
 - `status` 与 `repository_id`：声明可写、归档或删除状态，为已有仓库和生命周期操作绑定数字 ID。
 - `fork` 与 `default_branch`：绑定来源 ID、Fork 范围和默认分支。
-- `readme_template` 与 `license`：新仓库初始化内容；许可证选择用于普通新建仓库。
+- `mirror`：绑定镜像来源的 HTTPS 克隆地址；来源位于 github.com 时同时绑定仓库 ID。来源主机由政策的 `allowed_mirror_hosts` 限定。
+- `readme_template` 与 `license`：新仓库初始化内容；许可证选择用于普通新建仓库，可以省略，范围由政策的 `allowed_licenses` 限定。
 
 权限角色支持 `pull`、`triage`、`push`、`maintain`、`admin`。每个仓库必须指定维护负责人：个人或团队取得 `maintain` 或 `admin` 权限。管理端始终为政策中的管理员设置 `admin` 权限。
 
 管理员维护 `automation/policy.yml`，定义保留名称、团队清单、模板清单、保护用户与默认规则。YAML 拒绝重复键，Schema 拒绝未知字段及无效值。配置检查拒绝名称、模式、登记 ID 和初始化配置变化，以及单纯移除声明；目录移动由生命周期状态识别。配置字段作为数据传递到库和 Terraform。
 
-新仓库和 Fork 管理仓库属性、默认分支、初始化 README、直接授权与保护规则。`mode: existing` 导入准确 ID 的仓库和授权资源，管理直接权限及生命周期，保留已有内容、默认分支、属性和保护规则。团队和组织成员由组织管理员维护。
+新仓库、Fork 和镜像仓库管理仓库属性、默认分支、初始化 README、直接授权与保护规则。`mode: existing` 导入准确 ID 的仓库和授权资源，管理直接权限及生命周期，保留已有内容、默认分支、属性和保护规则。团队和组织成员由组织管理员维护。
 
 ## PR 与 CI 流程
 
@@ -94,7 +95,7 @@ flowchart TD
 1. 读取合并提交，确认关联 PR 和已通过的检查，重复执行配置及政策校验。
 2. 获取写入 GitHub App 的临时令牌，核验 Actions 审核 artifact 的工作流来源、提交、运行次数和内容，将加密审核记录保存到私有仓库，锁定 Terraform 状态。
 3. 刷新 GitHub 实际状态，生成执行计划，检查计划只涉及已批准配置的资源和字段。
-4. Provider 创建普通仓库。GitHub Fork API 创建 Fork，保存返回 ID 后由 Terraform import 登记。已有仓库在计划中导入。新仓库默认分支为 `main`，Fork 保留来源默认分支。
+4. Provider 创建普通仓库。GitHub Fork API 创建 Fork，保存返回 ID 后由 Terraform import 登记。镜像复制通过 REST API 创建空仓库并关闭 Actions，用 git 推送预览快照中的分支和标签，保存 ID 后由 Terraform import 登记。已有仓库在计划中导入。新仓库默认分支为 `main`，Fork 和镜像仓库保留来源默认分支。
 5. 设置管理团队、申请团队和个人协作者的权限。
 6. 设置目标仓库的默认分支保护，要求通过 PR 合并、经过审核，并保护分支免受删除和强制推送。仓库申请中的 `ruleset.admin_bypass` 可以配置管理员在合并 PR 时绕过审核；私有仓库的规则以组织已开通的 GitHub 套餐能力为部署条件。
 7. 通过 GitHub API 核验仓库属性、默认分支、直接权限和邀请状态，记录 Terraform 状态及执行结果。
@@ -114,7 +115,7 @@ flowchart TD
 - GitHub App 关闭 Webhook。官方 `@octokit/auth-app` 使用环境私钥生成临时令牌，核实有效的 `gevico` 全仓库安装。生命周期写入按数字 ID 限定范围，查询和核验使用全安装范围只读令牌。[官方认证库](https://github.com/octokit/auth-app.js)
 - PR 预览使用只读 GitHub App，读取组织、团队和仓库资料。
 - 读取私钥放在 `preview` 环境的 secrets 中，该环境的可部署分支限定为 `main`。
-- 创建及权限设置使用独立的写入 GitHub App，授予需要的仓库 `Administration`、`Contents` 和组织 `Members` 权限，安装范围覆盖受管理的新仓库。
+- 创建及权限设置使用独立的写入 GitHub App，授予需要的仓库 `Administration`、`Contents` 和组织 `Members` 权限，安装范围覆盖受管理的新仓库。镜像复制推送来源中的 workflow 文件，执行镜像申请时另外申请 `Workflows` 权限。
 - 写入私钥放在 `production` 环境的 secrets 中，该环境的可部署分支限定为 `main`。正常执行的批准来自 PR 审核和合并。
 - `GITHUB_TOKEN` 用于发布管理仓库的检查结果、执行报告和访问 Actions artifacts。age 私钥保存在 `preview` 和 `production` 环境 Secrets，公钥保存在仓库 variable。私钥的本地备份使用 `0600` 权限并排除版本管理。
 - 依赖和 Actions 固定版本或提交 SHA；带凭证的任务执行受信任的管理程序。

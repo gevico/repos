@@ -9,16 +9,19 @@ import { saveReview, loadReview } from './reviews.mjs';
 import { AppSession } from './app-session.mjs';
 import { importTargets, initializeForks, verifyForkSource } from './onboarding.mjs';
 import { ForkCredentialError, reportForkCredentialIssue } from './credentials.mjs';
+import { mirrorSnapshot, describeMirrors, initializeMirrors, verifyMirrorCopy } from './mirror.mjs';
 
 const command = process.argv[2];
 let pullRequest;
 let control;
 let store;
 let session;
+let readToken;
 
 async function readSession() {
   session = await AppSession.open();
   const reader = await session.token('read');
+  readToken = reader.token;
   process.env.GH_TOKEN = reader.token;
   process.env.GITHUB_TOKEN = reader.token;
   return reader.client;
@@ -41,6 +44,7 @@ async function initialFiles(client, catalog, review) {
       const { data } = await client.rest.licenses.getForRepo({ owner: 'gevico', repo: name });
       if (data.license?.key !== request.license) throw new Error(`${name}: initialized license differs from the approved selection`);
     }
+    if (repositoryMode(request) === 'mirror') await verifyMirrorCopy(client, readToken, name, review.mirrors[name]);
   }
 }
 
@@ -72,7 +76,7 @@ async function request() {
   const reader = await readSession();
   const before = await remoteCatalog(control, owner, repo, pullRequest.base.sha, path.join(work, 'base'));
   const after = await remoteCatalog(control, owner, repo, head, path.join(work, 'head'));
-  const { lifecycle } = checkTransition(before.catalog, after.catalog);
+  const { lifecycle } = checkTransition(before.catalog, after.catalog, after.policy);
   const changed = changedNames(before.catalog, after.catalog);
   store = await StateStore.open();
   const applied = await store.get('applied.json', true);
@@ -85,6 +89,10 @@ async function request() {
     await verifyForkSource(reader, after.catalog[name]);
     if (!before.catalog[name] && after.catalog[name].fork.owner.toLowerCase() !== 'gevico' && process.env.FORK_ENABLED !== 'true') throw new Error('External Fork requests require configured production FORK_USER_TOKEN and FORK_ENABLED=true');
   }
+  const mirrorNames = changed.filter((name) => !before.catalog[name] && repositoryMode(after.catalog[name]) === 'mirror');
+  if (mirrorNames.length && process.env.MIRROR_ENABLED !== 'true') throw new Error('Mirror requests require the write App Workflows permission and MIRROR_ENABLED=true');
+  const mirrors = {};
+  for (const name of mirrorNames) mirrors[name] = await mirrorSnapshot(reader, after.catalog[name], after.policy);
   const imports = await importTargets(reader, after.catalog, stateBefore);
   const directory = await prepareTerraform(after.catalog, after.policy, store, imports);
   const plan = await terraformPlan(directory, { readOnly: true });
@@ -96,9 +104,10 @@ async function request() {
   const lock = await fs.readFile(path.join(engine, 'terraform/.terraform.lock.hcl'), 'utf8');
   const review = { number, head, base: pullRequest.base.sha, config_digest: digest(after.catalog), policy_digest: digest(after.policy), lock_digest: digest(lock), state_version: stateBefore.version, changed, lifecycle, intents,
     repository_ids: Object.fromEntries(changed.filter((name) => after.catalog[name].repository_id).map((name) => [name, after.catalog[name].repository_id])),
-    forks: Object.fromEntries(changed.filter((name) => !before.catalog[name] && repositoryMode(after.catalog[name]) === 'fork').map((name) => [name, after.catalog[name].fork])) };
+    forks: Object.fromEntries(changed.filter((name) => !before.catalog[name] && repositoryMode(after.catalog[name]) === 'fork').map((name) => [name, after.catalog[name].fork])), mirrors };
   await saveReview(review);
-  await comment(control, owner, repo, number, `### Repository request\n\nCommit: \`${head}\`\n\n${describeIntents(intents)}\n\nMerge this PR after the configuration and these changes have been approved.`);
+  const copies = describeMirrors(mirrors);
+  await comment(control, owner, repo, number, `### Repository request\n\nCommit: \`${head}\`\n\n${describeIntents(intents)}${copies ? `\n\n${copies}` : ''}\n\nMerge this PR after the configuration and these changes have been approved.`);
   await status(control, owner, repo, head, 'success', 'Repository configuration and execution preview validated', 'request/check');
 }
 
@@ -127,7 +136,7 @@ async function apply() {
     const base = commit.parents[0]?.sha;
     if (!base) throw new Error('Merged commit must have an approved base commit');
     const before = await remoteCatalog(control, owner, repo, base, path.join(work, 'base'));
-    transition = checkTransition(before.catalog, catalog);
+    transition = checkTransition(before.catalog, catalog, policy);
     const changed = changedNames(before.catalog, catalog);
     if (changed.length) {
       const saved = await store.get(`reviews/${pullRequest.number}/${pullRequest.head.sha}.json`, true);
@@ -139,26 +148,30 @@ async function apply() {
   }
   requireLifecycleMigration(state, transition.lifecycle);
   const records = [...(applied?.data.repositories ?? [])];
-  for (const name of Object.keys(review?.forks ?? {})) {
-    const initialization = await store.get(`forks/${pullRequest.number}/${pullRequest.head.sha}/${name}.json`, true);
-    if (initialization?.data.id && !records.some((item) => item.name === name)) records.push({ name, id: initialization.data.id, origin: 'fork-init' });
+  for (const [mode, requests] of [['fork', review?.forks], ['mirror', review?.mirrors]]) for (const name of Object.keys(requests ?? {})) {
+    const initialization = await store.get(`${mode}s/${pullRequest.number}/${pullRequest.head.sha}/${name}.json`, true);
+    if (initialization?.data.id && !records.some((item) => item.name === name)) records.push({ name, id: initialization.data.id, origin: `${mode}-init` });
   }
   const ids = await inspectCatalog(reader, catalog, policy, state, records);
   const stateRepository = (await reader.rest.repos.get({ owner, repo: 'repos-state' })).data;
   await store.close(); store = null;
-  const writer = await session.token('write', transition.lifecycle ? [...ids, stateRepository.id] : null);
+  const writer = await session.token('write', transition.lifecycle ? [...ids, stateRepository.id] : null, { workflows: Object.keys(review?.mirrors ?? {}).length > 0 });
   process.env.GH_TOKEN = writer.token;
   process.env.GITHUB_TOKEN = writer.token;
   store = await StateStore.open();
   if ((await store.terraformState()).version !== state.version) throw new Error('Terraform state changed while preparing execution; rerun Apply');
   if (review) await store.put(`reviews/${pullRequest.number}/${pullRequest.head.sha}.json`, review);
-  const forkIds = review ? await initializeForks(reader, writer.client, catalog, review.changed, store, `${pullRequest.number}/${pullRequest.head.sha}`) : {};
+  const approvalKey = review ? `${pullRequest.number}/${pullRequest.head.sha}` : null;
+  const initializedIds = review ? {
+    ...await initializeForks(reader, writer.client, catalog, review.changed, store, approvalKey),
+    ...await initializeMirrors(reader, writer.client, writer.token, catalog, review.changed, review.mirrors ?? {}, store, approvalKey),
+  } : {};
   const currentState = await store.terraformState();
   const imports = await importTargets(reader, catalog, currentState);
   const directory = await prepareTerraform(catalog, policy, store, imports);
   const plan = await terraformPlan(directory);
-  authorizePlan(plan, catalog, policy, review?.changed ?? [], review?.intents ?? [], { allowMigration: !review, lifecycle: transition.lifecycle, forkIds });
-  await inspectCatalog(reader, catalog, policy, currentState, [...records, ...Object.entries(forkIds).filter(([name]) => !records.some((item) => item.name === name)).map(([name, id]) => ({ name, id, origin: 'fork-init' }))]);
+  authorizePlan(plan, catalog, policy, review?.changed ?? [], review?.intents ?? [], { allowMigration: !review, lifecycle: transition.lifecycle, initializedIds });
+  await inspectCatalog(reader, catalog, policy, currentState, [...records, ...Object.entries(initializedIds).filter(([name]) => !records.some((item) => item.name === name)).map(([name, id]) => ({ name, id, origin: `${repositoryMode(catalog[name])}-init` }))]);
   await terraformApply(directory);
   // GitHub exposes ruleset bypass actors only to callers with ruleset write access.
   const result = await verifyCatalog(writer.client, catalog, policy);

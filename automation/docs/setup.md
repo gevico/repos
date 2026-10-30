@@ -8,7 +8,7 @@
 
 读取 App 的权限：仓库 `Administration: read`、`Contents: read`、`Metadata: read`，组织 `Members: read`。
 
-写入 App 的权限：仓库 `Administration: write`、`Contents: write`、`Metadata: read`，组织 `Members: read`。工作流中的管理仓库检查、评论和重新运行操作使用 Actions 提供的 `GITHUB_TOKEN`。
+写入 App 的权限：仓库 `Administration: write`、`Contents: write`、`Workflows: write`、`Metadata: read`，组织 `Members: read`。`Workflows: write` 只在执行镜像复制时申请，见[镜像复制](#镜像复制)。工作流中的管理仓库检查、评论和重新运行操作使用 Actions 提供的 `GITHUB_TOKEN`。
 
 保存以下配置：
 
@@ -33,6 +33,16 @@ gh variable set FORK_ENABLED --repo gevico/repos --body true
 Credentials 工作流每天在 UTC 01:17 检查用户身份和组织所有者权限，也支持手动执行。令牌失效、缺失或权限不足时，自动在 `gevico/repos` 创建 Issue 并提及 `@zevorn`。已有同类未关闭 Issue 时复用；凭证恢复后关闭对应 Issue。Apply 的 Fork 凭证失败也使用该提醒。`FORK_ENABLED=true` 启用每日检查和跨组织 Fork 申请。
 
 OAuth 令牌连续一年未使用会被 GitHub 撤销，用户、授权应用或 GitHub 也可以撤销令牌。更新上述 secret 后重新运行 Credentials 或失败的 Apply。[GitHub 令牌规则](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/token-expiration-and-revocation)
+
+## 镜像复制
+
+镜像复制由写入 App 推送来源的分支和标签。来源中的 `.github/workflows/` 文件要求推送令牌具有 `Workflows: write` 权限。为写入 App 增加该权限，在组织中批准新的权限请求，然后设置：
+
+```bash
+gh variable set MIRROR_ENABLED --repo gevico/repos --body true
+```
+
+`MIRROR_ENABLED=true` 时 Request 接收新的镜像申请。Apply 只在执行镜像申请时为写入令牌申请 `workflows` 权限，其他执行使用原有权限。允许的来源主机由 `automation/policy.yml` 的 `allowed_mirror_hosts` 维护，修改通过维护 PR 审核。
 
 ## 组织成员创建权限
 

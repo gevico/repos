@@ -4,6 +4,7 @@ import { parseArgs } from 'node:util';
 import { root, loadCatalog, loadPolicy, validateRequest, requestYaml, terraformValues, writeJson, repositoryStatus, requestPath, checkTransition } from './config.mjs';
 import { github, inspectCatalog, findRepository } from './github.mjs';
 import { existingRequest } from './onboarding.mjs';
+import { resolveMirror } from './mirror.mjs';
 
 function assignment(value) {
   const [identity, role, extra] = value.split(':');
@@ -21,6 +22,7 @@ async function main() {
     name: { type: 'string' },
     status: { type: 'string' },
     fork: { type: 'string' },
+    mirror: { type: 'string' },
     'default-branch-only': { type: 'boolean', default: false },
     'readme-template': { type: 'string' },
     license: { type: 'string' },
@@ -53,6 +55,8 @@ async function main() {
       ...(values['readme-template'] ? { readme_template: values['readme-template'] } : {}),
       ...(values.license ? { license: values.license } : {}),
     };
+    if (values.fork && values.mirror) throw new Error('Use either --fork or --mirror');
+    if (values.mirror) Object.assign(request, { mode: 'mirror', ...(await resolveMirror(values.mirror, policy)) });
     if (values.fork) {
       const [owner, repository, extra] = values.fork.split('/');
       if (!owner || !repository || extra) throw new Error('--fork requires owner/repository');
@@ -63,7 +67,9 @@ async function main() {
       request.fork = { owner, repository, source_repository_id: source.id, default_branch_only: values['default-branch-only'] };
     }
     await validateRequest(request, policy, `${request.name}.yaml`);
-    if ((await loadCatalog()).catalog[request.name]) throw new Error(`${request.name} already has a request; edit the existing file`);
+    const { catalog } = await loadCatalog();
+    if (catalog[request.name]) throw new Error(`${request.name} already has a request; edit the existing file`);
+    checkTransition(catalog, { ...catalog, [request.name]: request }, policy);
     process.stdout.write(requestYaml(request));
     return;
   }
@@ -84,7 +90,7 @@ async function main() {
     for (const identity of values['remove-user']) delete request.access.users[identity];
     for (const identity of values['remove-team']) delete request.access.teams[identity];
     await validateRequest(request, policy, requestPath(request));
-    if (previous) checkTransition(catalog, { ...catalog, [request.name]: request });
+    if (previous) checkTransition(catalog, { ...catalog, [request.name]: request }, policy);
     process.stdout.write(requestYaml(request));
     return;
   }
@@ -98,7 +104,7 @@ async function main() {
     if (!repository || (previous.repository_id && previous.repository_id !== repository.id)) throw new Error(`${previous.name}: the existing repository ID could not be verified`);
     const request = { ...previous, status: values.status, repository_id: repository.id };
     await validateRequest(request, policy, requestPath(request));
-    checkTransition(catalog, { ...catalog, [request.name]: request });
+    checkTransition(catalog, { ...catalog, [request.name]: request }, policy);
     process.stdout.write(requestYaml(request));
     return;
   }
